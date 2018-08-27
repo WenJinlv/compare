@@ -271,10 +271,69 @@ class Strategy(metaclass=ABCMeta):
         self.dst_index = dst_index
         self.dst_index_space = dst_index_space
         self.grid_type  = grid_type
+        self.observers = []
 
     @abstractmethod
-    def strategy(self):
+    def strategy(self, func):
         pass
+
+    def register(self, observer):
+        self.observers.append(observer)
+
+    def updateAll(self):
+        for observer in self.observers:
+            self.strategy(observer.table)
+
+
+class ClobalStrategy(Strategy):
+
+    def strategy(self, func):
+        print("\n" + "=" * 25 + "compare two hdf5 file=" + "=" * 25)
+        print("\nexe path: {:^16}  \nsrc path: {:^16}  \ntarget path: {:^16} \n".
+              format(self.args['pwd'], self.args['src_file'], self.args['dst_file']))
+
+        diff_gen = MeasureError(self.src_data, self.dst_data, self.args)
+        for diff in diff_gen:
+            output = _statstics_quantity(diff, self.args['bins'])
+            func(output)
+
+
+class ItemStrategy(Strategy):
+
+    def strategy(self, func):
+        print("\n" + "=" * 25 + "compare two hdf5 file=" + "=" * 25)
+        print("\nexe path: {:^16}  \nsrc path: {:^16}  \ntarget path: {:^16} \n".
+              format(self.args['pwd'], self.args['src_file'], self.args['dst_file']))
+
+        for src_field_key, dst_field_key in zip(self.src_field.keys(),
+                                                self.dst_field.keys()):
+            diff_gen = MeasureError(self.src_field[src_field_key],
+                                     self.dst_field[dst_field_key], self.args)
+            for diff in diff_gen:
+                output = _statstics_quantity(diff, self.args['bins'])
+                func(output, field_key=src_field_key)
+
+
+class Detail_strategy(Strategy):
+
+    def strategy(self, func):
+        print("\n" + "=" * 25 + "compare two hdf5 file=" + "=" * 25)
+        print("\nexe path: {:^16}  \nsrc path: {:^16}  \ntarget path: {:^16} \n".
+              format(self.args['pwd'], self.args['src_file'], self.args['dst_file']))
+
+        diff_gen = MeasureError(self.src_data, self.dst_data, self.args)
+        for diff in diff_gen:
+            if len(diff[diff > 1e-12]) == 0:
+                print("    NO ERROR    ")
+            else:
+                output = _statstics_quantity(diff[diff > 1e-12], self.args['bins'])
+                func(output, diff=diff)
+
+
+class Obersever(object):
+    def __init__(self, subject):
+        self.subject = subject
+        subject.register(self)
 
     def table(self, output, diff=None, field_key=None):
         table = prettytable.PrettyTable(
@@ -290,87 +349,41 @@ class Strategy(metaclass=ABCMeta):
             [output[0], output[1], output[2], output[3], output[4]])
         histogram_table.add_column(
             "Bin", [(output[5][1][i], output[5][1][i + 1])
-                    for i in range(self.args['bins']) if output[5][0][i] > 0])
+                    for i in range(self.subject.args['bins']) if output[5][0][i] > 0])
         histogram_table.add_column("Count", [
-            output[5][0][i] for i in range(self.args['bins']) if output[5][0][i] > 0
+            output[5][0][i] for i in range(self.subject.args['bins']) if output[5][0][i] > 0
         ])
-
-        if self.__class__.__name__ == "Detail_strategy":
+        if self.subject.__class__.__name__ == "Detail_strategy":
             detail_table = prettytable.PrettyTable(
                 ['error', 'src_data', 'dst_data', 'index', 'index space'])
-            if self.grid_type == b'Unstructured Mesh':
+            if self.subject.grid_type == b'Unstructured Mesh':
                 [
                     detail_table.add_row([
                         d, src, dst, (index[1], index_space[1], index[0]),
                         index_space[0]
                     ]) for d, src, dst, index, index_space in zip(
-                    diff, self.src_data, self.dst_data, self.src_index,
-                    self.src_index_space) if d > 1e-12
+                    diff, self.subject.src_data, self.subject.dst_data, self.subject.src_index,
+                    self.subject.src_index_space) if d > 1e-12
                 ]
             else:
                 [
                     detail_table.add_row(
                         [d, src, dst, index, index_space[0]])
                     for d, src, dst, index, index_space in zip(
-                    diff, self.src_data, self.dst_data, self.src_index,
-                    self.src_index_space) if d > 1e-12
+                    diff, self.subject.src_data, self.subject.dst_data, self.subject.src_index,
+                    self.subject.src_index_space) if d > 1e-12
                 ]
 
         print(table)
-        if self.__class__.__name__ == "Detail_strategy":
+        if self.subject.__class__.__name__ == "Detail_strategy":
             print("    histogram(only display count>0):")
         else:
             print("    histogram:")
         print(histogram_table)
-        if self.__class__.__name__ == "Detail_strategy":
+        if self.subject.__class__.__name__ == "Detail_strategy":
             print("    detail info:")
             print(detail_table)
         print("\n")
-
-
-class ClobalStrategy(Strategy):
-
-    def strategy(self):
-        print("\n" + "=" * 25 + "compare two hdf5 file=" + "=" * 25)
-        print("\nexe path: {:^16}  \nsrc path: {:^16}  \ntarget path: {:^16} \n".
-              format(self.args['pwd'], self.args['src_file'], self.args['dst_file']))
-
-        diff_gen = MeasureError(self.src_data, self.dst_data, self.args)
-        for diff in diff_gen:
-            output = _statstics_quantity(diff, self.args['bins'])
-            self.table(output)
-
-
-class ItemStrategy(Strategy):
-
-    def strategy(self):
-        print("\n" + "=" * 25 + "compare two hdf5 file=" + "=" * 25)
-        print("\nexe path: {:^16}  \nsrc path: {:^16}  \ntarget path: {:^16} \n".
-              format(self.args['pwd'], self.args['src_file'], self.args['dst_file']))
-
-        for src_field_key, dst_field_key in zip(self.src_field.keys(),
-                                                self.dst_field.keys()):
-            diff_gen = MeasureError(self.src_field[src_field_key],
-                                     self.dst_field[dst_field_key], self.args)
-            for diff in diff_gen:
-                output = _statstics_quantity(diff, self.args['bins'])
-                self.table(output, field_key=src_field_key)
-
-
-class Detail_strategy(Strategy):
-
-    def strategy(self):
-        print("\n" + "=" * 25 + "compare two hdf5 file=" + "=" * 25)
-        print("\nexe path: {:^16}  \nsrc path: {:^16}  \ntarget path: {:^16} \n".
-              format(self.args['pwd'], self.args['src_file'], self.args['dst_file']))
-
-        diff_gen = MeasureError(self.src_data, self.dst_data, self.args)
-        for diff in diff_gen:
-            if len(diff[diff > 1e-12]) == 0:
-                print("    NO ERROR    ")
-            else:
-                output = _statstics_quantity(diff[diff > 1e-12], self.args['bins'])
-                self.table(output, diff=diff)
 
 
 def main():
@@ -391,11 +404,12 @@ def main():
     if args['strategy'] == 3:
         Strategy = Detail_strategy
 
-    Strategy(args, src_data, dst_data,
+    strategy = Strategy(args, src_data, dst_data,
                  src_field, src_index, src_index_space,
                  dst_field, dst_index, dst_index_space,
-                 grid_type).strategy()
-
+                 grid_type)
+    observer = Obersever(strategy)
+    strategy.updateAll()
 
 if __name__ == "__main__":
     main()
