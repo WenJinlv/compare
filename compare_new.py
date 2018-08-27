@@ -288,23 +288,26 @@ class ClobalStrategy(Strategy):
         diff_gen = MeasureError(self.src_data, self.dst_data, self.args)
         for diff in diff_gen:
             output = _statstics_quantity(diff, self.args['bins'])
-            print("    statstics info: ")
-            table = prettytable.PrettyTable([
-                'max', 'min', 'average', 'missing value count', 'element count'
-            ])
-            histogram_table = prettytable.PrettyTable()
-            table.add_row(
-                [output[0], output[1], output[2], output[3], output[4]])
-            histogram_table.add_column("Bin",
-                                       [(output[5][1][i], output[5][1][i + 1])
-                                        for i in range(self.args['bins'])
-                                        if output[5][0][i] > 0])
-            histogram_table.add_column(
-                "Count",
-                [output[5][0][i] for i in range(self.args['bins']) if output[5][0][i] > 0])
-            print(table)
-            print("    histogram:")
-            print(histogram_table)
+            self.table(output)
+
+    def table(self, output, diff=None, field_key=None):
+        print("    statstics info: ")
+        table = prettytable.PrettyTable([
+            'max', 'min', 'average', 'missing value count', 'element count'
+        ])
+        histogram_table = prettytable.PrettyTable()
+        table.add_row(
+            [output[0], output[1], output[2], output[3], output[4]])
+        histogram_table.add_column("Bin",
+                                   [(output[5][1][i], output[5][1][i + 1])
+                                    for i in range(self.args['bins'])
+                                    if output[5][0][i] > 0])
+        histogram_table.add_column(
+            "Count",
+            [output[5][0][i] for i in range(self.args['bins']) if output[5][0][i] > 0])
+        print(table)
+        print("    histogram:")
+        print(histogram_table)
 
 
 class ItemStrategy(Strategy):
@@ -320,26 +323,28 @@ class ItemStrategy(Strategy):
                                      self.dst_field[dst_field_key], self.args)
             for diff in diff_gen:
                 output = _statstics_quantity(diff, self.args['bins'])
-                table = prettytable.PrettyTable([
-                    'max', 'min', 'average', 'missing value count',
-                    'element count'
-                ])
-                histogram_table = prettytable.PrettyTable()
-                print("    data item: {} ".format(src_field_key))
-                print("    statstics info: ")
-                table.add_row(
-                    [output[0], output[1], output[2], output[3], output[4]])
-                histogram_table.add_column(
-                    "Bin", [(output[5][1][i], output[5][1][i + 1])
-                            for i in range(self.args['bins']) if output[5][0][i] > 0])
-                histogram_table.add_column("Count", [
-                    output[5][0][i] for i in range(self.args['bins']) if output[5][0][i] > 0
-                ])
-                print(table)
-                print("    histogram:")
-                print(histogram_table)
-                print("\n")
+                self.table(output, src_field_key)
 
+    def table(self, output, diff=None, field_key=None):
+        table = prettytable.PrettyTable([
+            'max', 'min', 'average', 'missing value count',
+            'element count'
+        ])
+        histogram_table = prettytable.PrettyTable()
+        print("    data item: {} ".format(field_key))
+        print("    statstics info: ")
+        table.add_row(
+            [output[0], output[1], output[2], output[3], output[4]])
+        histogram_table.add_column(
+            "Bin", [(output[5][1][i], output[5][1][i + 1])
+                    for i in range(self.args['bins']) if output[5][0][i] > 0])
+        histogram_table.add_column("Count", [
+            output[5][0][i] for i in range(self.args['bins']) if output[5][0][i] > 0
+        ])
+        print(table)
+        print("    histogram:")
+        print(histogram_table)
+        print("\n")
 
 class Detail_strategy(Strategy):
 
@@ -350,47 +355,49 @@ class Detail_strategy(Strategy):
 
         diff_gen = MeasureError(self.src_data, self.dst_data, self.args)
         for diff in diff_gen:
-            table = prettytable.PrettyTable(
-                ['max', 'min', 'average', 'missing value count', 'element count'])
-            histogram_table = prettytable.PrettyTable()
-            detail_table = prettytable.PrettyTable(
-                ['error', 'src_data', 'dst_data', 'index', 'index space'])
             if len(diff[diff > 1e-12]) == 0:
                 print("    NO ERROR    ")
             else:
                 output = _statstics_quantity(diff[diff > 1e-12], self.args['bins'])
-                print("    statstics info: ")
-                table.add_row(
-                    [output[0], output[1], output[2], output[3], output[4]])
-                histogram_table.add_column(
-                    "Bin", [(output[5][1][i], output[5][1][i + 1])
-                            for i in range(self.args['bins']) if output[5][0][i] > 0])
-                histogram_table.add_column("Count", [
-                    output[5][0][i] for i in range(self.args['bins']) if output[5][0][i] > 0
-                ])
-                if self.grid_type == b'Unstructured Mesh':
-                    [
-                        detail_table.add_row([
-                            d, src, dst, (index[1], index_space[1], index[0]),
-                            index_space[0]
-                        ]) for d, src, dst, index, index_space in zip(
-                        diff, self.src_data, self.dst_data, self.src_index,
-                        self.src_index_space) if d > 1e-12
-                    ]
-                else:
-                    [
-                        detail_table.add_row(
-                            [d, src, dst, index, index_space[0]])
-                        for d, src, dst, index, index_space in zip(
-                        diff, self.src_data, self.dst_data, self.src_index,
-                        self.src_index_space) if d > 1e-12
-                    ]
-                print(table)
-                print("    histogram(only display count>0):")
-                print(histogram_table)
-                print("    detail info:")
-                print(detail_table)
+                self.table(output, diff)
 
+    def table(self, output, diff=None, field_key=None):
+        table = prettytable.PrettyTable(
+            ['max', 'min', 'average', 'missing value count', 'element count'])
+        histogram_table = prettytable.PrettyTable()
+        detail_table = prettytable.PrettyTable(
+            ['error', 'src_data', 'dst_data', 'index', 'index space'])
+        print("    statstics info: ")
+        table.add_row(
+            [output[0], output[1], output[2], output[3], output[4]])
+        histogram_table.add_column(
+            "Bin", [(output[5][1][i], output[5][1][i + 1])
+                    for i in range(self.args['bins']) if output[5][0][i] > 0])
+        histogram_table.add_column("Count", [
+            output[5][0][i] for i in range(self.args['bins']) if output[5][0][i] > 0
+        ])
+        if self.grid_type == b'Unstructured Mesh':
+            [
+                detail_table.add_row([
+                    d, src, dst, (index[1], index_space[1], index[0]),
+                    index_space[0]
+                ]) for d, src, dst, index, index_space in zip(
+                diff, self.src_data, self.dst_data, self.src_index,
+                self.src_index_space) if d > 1e-12
+            ]
+        else:
+            [
+                detail_table.add_row(
+                    [d, src, dst, index, index_space[0]])
+                for d, src, dst, index, index_space in zip(
+                diff, self.src_data, self.dst_data, self.src_index,
+                self.src_index_space) if d > 1e-12
+            ]
+        print(table)
+        print("    histogram(only display count>0):")
+        print(histogram_table)
+        print("    detail info:")
+        print(detail_table)
 
 def main():
     args = parse_commandline()
