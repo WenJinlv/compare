@@ -63,6 +63,9 @@ def parse_commandline():
 
 
 class ReadHdf5(object):
+    """
+    Get hdf5 file information
+    """
     def __init__(self, filename):
         self.filename = filename
         self.data_item = None
@@ -203,6 +206,8 @@ class ConcateField(object):
 
 class MeasureError(object):
     """ Measure the error of source & target file
+        Use __iter__ for support continuous input error rule,
+        for instance, --absolute error --relate_error
     """
     def __init__(self, src_data, dst_data, args):
         self.args = args
