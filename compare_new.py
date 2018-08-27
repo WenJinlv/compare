@@ -222,7 +222,7 @@ class MeasureError(object):
         count = 0
         for rule in self.rules:
             if self.args[rule['name']]:
-                print("\n\n display: " + rule['name'].split('_')[-2] + " error")
+                print("\n display: " + rule['name'].split('_')[-2] + " error")
                 yield rule['measure'](self.__src_data, self.__dst_data)
             else:
                 count += 1
@@ -274,7 +274,7 @@ class Strategy(metaclass=ABCMeta):
         self.observers = []
 
     @abstractmethod
-    def strategy(self, func):
+    def strategy(self, view):
         pass
 
     def register(self, observer):
@@ -287,7 +287,7 @@ class Strategy(metaclass=ABCMeta):
 
 class ClobalStrategy(Strategy):
 
-    def strategy(self, func):
+    def strategy(self, view):
         print("\n" + "=" * 25 + "compare two hdf5 file=" + "=" * 25)
         print("\nexe path: {:^16}  \nsrc path: {:^16}  \ntarget path: {:^16} \n".
               format(self.args['pwd'], self.args['src_file'], self.args['dst_file']))
@@ -295,12 +295,12 @@ class ClobalStrategy(Strategy):
         diff_gen = MeasureError(self.src_data, self.dst_data, self.args)
         for diff in diff_gen:
             output = _statstics_quantity(diff, self.args['bins'])
-            func(output)
+            view(output)
 
 
 class ItemStrategy(Strategy):
 
-    def strategy(self, func):
+    def strategy(self, view):
         print("\n" + "=" * 25 + "compare two hdf5 file=" + "=" * 25)
         print("\nexe path: {:^16}  \nsrc path: {:^16}  \ntarget path: {:^16} \n".
               format(self.args['pwd'], self.args['src_file'], self.args['dst_file']))
@@ -311,12 +311,12 @@ class ItemStrategy(Strategy):
                                      self.dst_field[dst_field_key], self.args)
             for diff in diff_gen:
                 output = _statstics_quantity(diff, self.args['bins'])
-                func(output, field_key=src_field_key)
+                view(output, field_key=src_field_key)
 
 
 class Detail_strategy(Strategy):
 
-    def strategy(self, func):
+    def strategy(self, view):
         print("\n" + "=" * 25 + "compare two hdf5 file=" + "=" * 25)
         print("\nexe path: {:^16}  \nsrc path: {:^16}  \ntarget path: {:^16} \n".
               format(self.args['pwd'], self.args['src_file'], self.args['dst_file']))
@@ -327,10 +327,10 @@ class Detail_strategy(Strategy):
                 print("    NO ERROR    ")
             else:
                 output = _statstics_quantity(diff[diff > 1e-12], self.args['bins'])
-                func(output, diff=diff)
+                view(output, diff=diff)
 
 
-class Obersever(object):
+class TableObersever(object):
     def __init__(self, subject):
         self.subject = subject
         subject.register(self)
@@ -408,7 +408,7 @@ def main():
                  src_field, src_index, src_index_space,
                  dst_field, dst_index, dst_index_space,
                  grid_type)
-    observer = Obersever(strategy)
+    observer = TableObersever(strategy)
     strategy.updateAll()
 
 if __name__ == "__main__":
