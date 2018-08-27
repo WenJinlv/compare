@@ -232,6 +232,7 @@ class MeasureError(object):
                 yield rule['measure'](self.__src_data, self.__dst_data)
             else:
                 count += 1
+        # set default error rule if necessary
         if count == len(self.rules):
             print("\n\n display: absolute error")
             yield  np.abs(self.__src_data - self.__dst_data)
@@ -242,7 +243,6 @@ class MeasureError(object):
     def remove_rule(self):
         self.rules.pop()
 
-    # set default error rule
     def relate_error_rule(self, src_data, dst_data):
         src_data[np.where(src_data == 0)] = 1e-14
         return np.abs(src_data - dst_data) / np.abs(src_data)
