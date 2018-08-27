@@ -56,7 +56,7 @@ def parse_commandline():
     config = strategy_parser.parse_args()
 
     args = {'is_absolute_err': config.absolute_error, 'is_relate_err': config.relate_error,
-            'is_norm2_err': config.norm2_error, 'is_infnorm_err': config.inf_norm_error,
+            'is_norm2_err': config.norm2_error, 'is_inf_norm_err': config.inf_norm_error,
             'src_file': config.src_file, 'dst_file': config.target_file, 'pwd': os.getcwd(),
             'bins': config.bins, 'strategy': config.error_distributed }
     return args
@@ -93,16 +93,17 @@ class ReadHdf5(object):
             self.fields = [item[0].decode('ascii') for item in self.data_item]
             self.indexs = [(index[0].decode('ascii'), index[2], index[3], index[4])
                                for index in self.index_space]
+
     def get_data(self, field, index):
         with h5py.File(self.filename, 'r') as hdf:
-            raws_dataset = hdf.get(field + '@' + index)
-            self.elem_type = raws_dataset.attrs.get('elem_type')
-            return np.array(raws_dataset)
+            raw_dataset = hdf.get(field + '@' + index)
+            self.elem_type = raw_dataset.attrs.get('elem_type')
+            return np.array(raw_dataset)
 
 
 class ConcateIndex(object):
     """
-    Concate all index and data for specific field
+    Concatenate all index and data for specific field
 
     """
     def __init__(self, hdf5_info):
@@ -188,7 +189,7 @@ class ConcateIndex(object):
 
 
 class ConcateField(object):
-    """  Concate all field data for specific hdf5 file
+    """  Concatenate all field data for specific hdf5 file
     """
     def __init__(self, field_dict):
         self.field_dict = field_dict
@@ -214,7 +215,7 @@ class MeasureError(object):
              {'name': 'is_norm2_err',
               'measure': lambda src_data, dst_data: np.linalg.norm(
                   np.abs(src_data - dst_data)[~np.isnan(np.abs(src_data - dst_data))], 2)},
-             {'name': 'is_infnorm_err',
+             {'name': 'is_inf_norm_err',
               'measure': lambda src_data, dst_data: np.linalg.norm(
                   np.abs(src_data - dst_data)[~np.isnan(np.abs(src_data - dst_data))], np.inf)}]
 
@@ -236,6 +237,7 @@ class MeasureError(object):
     def remove_rule(self):
         self.rules.pop()
 
+    # set default error rule
     def relate_error_rule(self, src_data, dst_data):
         src_data[np.where(src_data == 0)] = 1e-14
         return np.abs(src_data - dst_data) / np.abs(src_data)
@@ -256,7 +258,9 @@ def _statstics_quantity(diff, bins):
 
 
 class Strategy(metaclass=ABCMeta):
-
+    """
+    Strategy Base Class
+    """
     def __init__(self, args, src_data, dst_data,
                  src_field, src_index, src_index_space,
                  dst_field, dst_index, dst_index_space,
@@ -285,8 +289,10 @@ class Strategy(metaclass=ABCMeta):
             self.strategy(observer.table)
 
 
-class ClobalStrategy(Strategy):
-
+class GlobalStrategy(Strategy):
+    """
+    Global information
+    """
     def strategy(self, view):
         print("\n" + "=" * 25 + "compare two hdf5 file=" + "=" * 25)
         print("\nexe path: {:^16}  \nsrc path: {:^16}  \ntarget path: {:^16} \n".
@@ -299,7 +305,10 @@ class ClobalStrategy(Strategy):
 
 
 class ItemStrategy(Strategy):
-
+    """
+    Field information such as velocity-x, velocity-y,
+    pressure-x, pressure-y
+    """
     def strategy(self, view):
         print("\n" + "=" * 25 + "compare two hdf5 file=" + "=" * 25)
         print("\nexe path: {:^16}  \nsrc path: {:^16}  \ntarget path: {:^16} \n".
@@ -315,7 +324,9 @@ class ItemStrategy(Strategy):
 
 
 class Detail_strategy(Strategy):
-
+    """
+    Detail information for every error data
+    """
     def strategy(self, view):
         print("\n" + "=" * 25 + "compare two hdf5 file=" + "=" * 25)
         print("\nexe path: {:^16}  \nsrc path: {:^16}  \ntarget path: {:^16} \n".
@@ -331,6 +342,11 @@ class Detail_strategy(Strategy):
 
 
 class TableObersever(object):
+    """
+    Use table to display hdf5 file compare result
+    Use Observer pattern
+    for easy extend future Observer such as graph
+    """
     def __init__(self, subject):
         self.subject = subject
         subject.register(self)
@@ -344,7 +360,7 @@ class TableObersever(object):
         if field_key:
             print("    data item: {} ".format(field_key))
 
-        print("    statstics info: ")
+        print("    statistics info: ")
         table.add_row(
             [output[0], output[1], output[2], output[3], output[4]])
         histogram_table.add_column(
@@ -353,6 +369,14 @@ class TableObersever(object):
         histogram_table.add_column("Count", [
             output[5][0][i] for i in range(self.subject.args['bins']) if output[5][0][i] > 0
         ])
+
+        print(table)
+        if self.subject.__class__.__name__ == "Detail_strategy":
+            print("    histogram(only display count>0):")
+        else:
+            print("    histogram:")
+        print(histogram_table)
+
         if self.subject.__class__.__name__ == "Detail_strategy":
             detail_table = prettytable.PrettyTable(
                 ['error', 'src_data', 'dst_data', 'index', 'index space'])
@@ -373,14 +397,6 @@ class TableObersever(object):
                     diff, self.subject.src_data, self.subject.dst_data, self.subject.src_index,
                     self.subject.src_index_space) if d > 1e-12
                 ]
-
-        print(table)
-        if self.subject.__class__.__name__ == "Detail_strategy":
-            print("    histogram(only display count>0):")
-        else:
-            print("    histogram:")
-        print(histogram_table)
-        if self.subject.__class__.__name__ == "Detail_strategy":
             print("    detail info:")
             print(detail_table)
         print("\n")
@@ -396,7 +412,7 @@ def main():
     dst_data = ConcateField(dst_field).concate_field()
 
     if args['strategy'] == 1:
-        Strategy = ClobalStrategy
+        Strategy = GlobalStrategy
 
     if args['strategy'] == 2:
         Strategy = ItemStrategy
@@ -410,6 +426,7 @@ def main():
                  grid_type)
     observer = TableObersever(strategy)
     strategy.updateAll()
+
 
 if __name__ == "__main__":
     main()
